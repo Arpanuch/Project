@@ -1,0 +1,308 @@
+import 'dart:convert';
+
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  // ignore: use_key_in_widget_constructors
+  const MyApp({Key? key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      title: 'Weather App',
+      home: WeatherScreen(),
+    );
+  }
+}
+
+class WeatherScreen extends StatefulWidget {
+  // ignore: use_key_in_widget_constructors
+  const WeatherScreen({Key? key});
+
+  @override
+  // ignore: library_private_types_in_public_api
+  _WeatherScreenState createState() => _WeatherScreenState();
+}
+
+class _WeatherScreenState extends State<WeatherScreen> {
+  final String _apiKey = '53769ea7d2bc944fe4a426a9eff24a62';
+  String _city = 'Bangkok';
+  // ignore: prefer_final_fields
+  TextEditingController _cityInputController = TextEditingController();
+
+  Future<Map<String, dynamic>> _getWeather(String city) async {
+    String apiUrl =
+        'https://api.openweathermap.org/data/2.5/weather?q=$city&appid=$_apiKey&units=metric';
+    http.Response response = await http.get(Uri.parse(apiUrl));
+    //print check data 
+    print(response.body);
+    return jsonDecode(response.body);
+  }
+
+  void _updateWeather(String city) {
+    setState(() {
+      _city = city;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Weather App'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: SizedBox(
+              width: 200,
+              child: TextField(
+                controller: _cityInputController,
+                decoration: const InputDecoration(
+                  labelText: 'Enter City',
+                  border: OutlineInputBorder(),
+                ),
+                onSubmitted: (value) {
+                  _updateWeather(value);
+                  _cityInputController.clear();
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: Center(
+        child: FutureBuilder(
+          future: _getWeather(_city),
+          builder: (context, AsyncSnapshot<Map<String, dynamic>> snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const CircularProgressIndicator();
+            } else {
+              if (snapshot.hasError) {
+                return Text('Error: ${snapshot.error}');
+              } else if (!snapshot.hasData) {
+                return const Text('No Data');
+              } else {
+                var weatherData = snapshot.data!;
+                return Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '${weatherData['name'] ?? 'Unknown'}, ${weatherData['sys']?['country'] ?? 'Unknown'}',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Icon(
+                      _getWeatherIcon(weatherData['weather'][0]['icon']),
+                      size: 100,
+                      color: Colors.blue,
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      '${weatherData['main']?['temp']} °C',
+                      style: const TextStyle(fontSize: 48),
+                    ),
+                    const SizedBox(height: 20),
+                    Column(
+                      children: [
+                        
+                        _buildWeatherButton('Bangkok', 'Bangkok Weather'),
+                        _buildWeatherButton('New York', 'New York Weather'),
+                        _buildWeatherButton('Tokyo', 'Tokyo Weather'),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => DetailsScreen(weatherData),
+                          ),
+                        );
+                      },
+                      child: const Text('More Details'),
+                    ),
+                  ],
+                );
+              }
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWeatherButton(String city, String buttonText) {
+    return ElevatedButton.icon(
+      onPressed: () => _updateWeather(city),
+      icon: const Icon(Icons.location_city),
+      label: Text(buttonText),
+      style: ElevatedButton.styleFrom(
+        foregroundColor: Colors.white,
+        backgroundColor: Colors.blue,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+    );
+  }
+
+  IconData _getWeatherIcon(String iconCode) {
+    switch (iconCode) {
+      case '01d':
+        return Icons.wb_sunny;
+      case '01n':
+        return Icons.nightlight_round;
+      case '02d':
+      case '02n':
+        return Icons.cloud;
+      case '03d':
+      case '03n':
+        return Icons.cloud_queue;
+      case '04d':
+      case '04n':
+        return Icons.cloud_off;
+      case '09d':
+      case '09n':
+        return Icons.grain;
+      case '10d':
+      case '10n':
+        return Icons.beach_access;
+      case '11d':
+      case '11n':
+        return Icons.flash_on;
+      case '13d':
+      case '13n':
+        return Icons.ac_unit;
+      case '50d':
+      case '50n':
+        return Icons.waves;
+      default:
+        return Icons.wb_cloudy;
+    }
+  }
+}
+
+class DetailsScreen extends StatelessWidget {
+  final dynamic weatherData;
+
+  // ignore: use_key_in_widget_constructors
+  const DetailsScreen(this.weatherData, {Key? key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Weather Details'),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildWeatherDescription(),
+            const SizedBox(height: 20),
+            _buildWeatherInfo(
+                'Humidity', '${weatherData['main']?['humidity']}%'),
+            _buildWeatherInfo(
+                'Wind Speed', '${weatherData['wind']?['speed']} m/s'),
+            _buildWeatherInfo(
+                'Pressure', '${weatherData['main']?['pressure']} hPa'),
+            _buildWeatherInfo(
+                'Visibility', '${(weatherData['visibility'] ?? 0) / 1000} km'),
+            _buildWeatherInfo('Sunrise',
+                _getTimeFromTimestamp(weatherData['sys']?['sunrise'])),
+            _buildWeatherInfo(
+                'Sunset', _getTimeFromTimestamp(weatherData['sys']?['sunset'])),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWeatherDescription() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Icon(
+          _getWeatherIcon(weatherData['weather']?[0]['icon'] ?? ''),
+          size: 100,
+          color: Colors.blue,
+        ),
+        const SizedBox(height: 20),
+        Text(
+          '${weatherData['weather']?[0]['description'] ?? 'Unknown'}',
+          style: const TextStyle(fontSize: 24),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWeatherInfo(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 18),
+        ),
+      ],
+    );
+  }
+
+  IconData _getWeatherIcon(String iconCode) {
+    switch (iconCode) {
+      case '01d':
+        return Icons.wb_sunny;
+      case '01n':
+        return Icons.nightlight_round;
+      case '02d':
+      case '02n':
+        return Icons.cloud;
+      case '03d':
+      case '03n':
+        return Icons.cloud_queue;
+      case '04d':
+      case '04n':
+       return Icons.cloud_off;
+      case '09d':
+      case '09n':
+        return Icons.grain;
+      case '10d':
+      case '10n':
+        return Icons.beach_access;
+      case '11d':
+      case '11n':
+        return Icons.flash_on;
+      case '13d':
+      case '13n':
+        return Icons.ac_unit;
+      case '50d':
+      case '50n':
+        return Icons.waves;
+      default:
+        return Icons.wb_cloudy;
+    }
+  }
+
+  String _getTimeFromTimestamp(int? timestamp) {
+    if (timestamp != null) {
+      return DateTime.fromMillisecondsSinceEpoch(timestamp * 1000).toString();
+    } else {
+      return 'Unknown';
+    }
+  }
+}
